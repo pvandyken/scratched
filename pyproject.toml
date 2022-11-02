@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "scratched"
+version = "0.1.0"
+description = "Check which files will be deleted on the 15th, remove the files, and update the list"
+authors = ["Peter Van Dyken <pvandyk2@uwo.ca>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=2"
+
+[tool.poetry.scripts]
+scratched = { reference = "bin/scratched", type="file" }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

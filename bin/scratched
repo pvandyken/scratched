@@ -1,0 +1,160 @@
+#!/bin/bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+trim () {
+  sed -e 's/^[ \t]*//' -e 's/[ \t]*$//' | tr -s ' '
+}
+
+isNumber () {
+  [[ $(echo "$1" | wc -l) == 1 && -n $(echo "$1" | grep -E "^[0-9]+$") ]]
+}
+
+printHelp () {
+  cat <<EOF
+Usage: expiring [OPTIONS] [PATTERN]
+
+List the files that will be deleted on the 15th of the month.
+
+By default, the files listed in /home/scratch_to_delete/[username] are listed,
+but an updated version of this list can be produced using the -u/--update flag.
+Any files that have been deleted or updated (via touch or otherwise) will be
+removed from the list
+
+Options
+=======
+  PATTERN
+    regex pattern to match
+
+  -d NUM, --depth NUM
+    The maximum file tree depth to display. e.g. -d 3 would print up to 3
+    subdirectories: '/scratch/username/foo'
+
+  -u, --update
+    Generate an updated version of the scratch_to_delete list, excluding any
+    files that have already been updated or deleted
+
+EOF
+}
+
+excluded=
+depth=
+update=
+params=
+while [[ -n "${1:-}" && ! "$1" == "--" ]]; do case "$1" in
+  -e | --exclude )
+    while [[ -n $2 && "$2" =~ ^[^-] ]]; do
+      excluded="${excluded} $2"
+      shift
+    done
+    ;;
+  -d | --depth )
+    if [[ -z ${2:-} ]]; then
+      echo "$1 takes one arg" >> /dev/stderr
+      exit 1
+    fi
+    isNumber "$2" || (echo "$1 must be given a number" >&2 && exit 1)
+    shift
+    depth=$1
+    ;;
+  -u | --update )
+    update=true
+    ;;
+  -h | --help )
+    printHelp
+    exit 0
+    ;;
+  -* | --* )
+    echo "Error: Unsupported flag $1" >&2
+    exit 1
+    ;;
+  * )
+    params="$params $1"
+    ;;
+esac; shift; done
+if [[ "${1:-}" == '--' ]]; then shift; fi
+params="$params ${*}"
+
+if [[ $(echo "$params" | wc -w) -gt 1 ]]; then
+  echo "Error: unrecognized args '$(echo "$params" | trim | cut -f2- -d' ')'" >&2
+  exit 1
+fi
+
+pattern=$(echo "$params" | trim)
+
+
+
+set_depth () {
+  local d
+  if [[ -n ${1:-} ]]; then
+    d=$(($1 + 1))
+    cut -d'/' -f1-$d | sort -u
+  else
+    cat
+  fi
+}
+
+print_progress () {
+  local k j bar_len current total prop percent
+  current=$1
+  total=$2
+  bar_len=$3
+
+  prop=$(($current * $bar_len / $total))
+  percent=$(($current * 100 / $total))
+  echo -n "[ "
+  for ((k = 0 ; k <= $prop; k++)); do echo -n "#"; done
+  for ((j = $k ; j <= $bar_len; j++)); do echo -n " "; done
+  echo -n " ] "
+  echo -n "$current/$total ($percent %)" $'\r'
+}
+
+date_milli () {
+  date +'%s%3N'
+}
+
+official=/home/scratch_to_delete/$(whoami)
+ours=$HOME/.cache/scratch_to_delete
+
+if [[ $official -nt $ours ]]; then
+  src=$official
+else
+  src=$ours
+fi
+
+if [[ -n $update ]]; then
+  tmp=$(mktemp "${TMPDIR:-/tmp/}$(basename $0).XXXXXXXXXX")
+  maxtime=5184000
+  i=0
+  len=$(cat $src | wc -l)
+  debounce=50
+  last_update=
+  for f in $(cat $src); do
+    i=$((i+1))
+    if [[ $(($last_update + $debounce)) -lt $(date_milli) ]]; then
+      last_update=$(date_milli)
+      print_progress $i $len 40
+    fi
+
+    if [[ "* $f *" == " $excluded " ]]; then
+      continue
+    fi
+    if [[ -e $f ]]; then
+      atime=$(($(date +%s) - $(stat -c %X $f)))
+      ctime=$(($(date +%s) - $(stat -c %Z $f)))
+      if [[ $atime -gt $maxtime || $ctime -gt $maxtime ]]; then
+        echo $f >> $tmp
+      fi
+    fi
+  done
+  echo
+  mkdir -p $(dirname $ours)
+  if [[ -e $ours ]]; then rm $ours; fi
+  mv $tmp $ours
+
+else
+  cat $src |
+    set_depth $depth |
+    eval $([[ -n "$pattern" ]] && echo 'grep "$pattern"' || echo 'cat')
+fi
