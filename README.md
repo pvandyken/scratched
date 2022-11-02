@@ -8,7 +8,7 @@ Lists the files that will be deleted from the Graham scratch folder on the 15th 
 
 
 ```
-Usage: expiring [OPTIONS] [PATTERN]
+Usage: scratched [OPTIONS] [PATTERN]
 
 List the files that will be deleted on the 15th of the month.
 

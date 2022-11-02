@@ -13,7 +13,7 @@ isNumber () {
 
 printHelp () {
   cat <<EOF
-Usage: expiring [OPTIONS] [PATTERN]
+Usage: scratched [OPTIONS] [PATTERN]
 
 List the files that will be deleted on the 15th of the month.
 
