@@ -31,3 +31,12 @@ Options
     files that have already been updated or deleted
 ```
 
+## Installation
+
+Easiest option is through `pipx`:
+
+```bash
+pipx install https://github.com/pvandyken/scratched.git
+```
+
+`pipx` installation instructions found [here](https://pypa.github.io/pipx/installation/). Note that the python packaging is just to make installation easier; the actual code is pure bash.
