@@ -16,7 +16,6 @@ scratched = { reference = "bin/scratched", type="file" }
 enable = true
 vcs = 'git'
 metadata = true
-style = 'semver'
 dirty = true
 bump = true
 
