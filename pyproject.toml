@@ -12,6 +12,14 @@ python = ">=2"
 [tool.poetry.scripts]
 scratched = { reference = "bin/scratched", type="file" }
 
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = 'git'
+metadata = true
+style = 'semver'
+dirty = true
+bump = true
+
 [build-system]
 requires = ["poetry-core", "poetry-dynamic-versioning"]
-build-backend = "poetry_dynamic-versioning.backend"
+build-backend = "poetry_dynamic_versioning.backend"
