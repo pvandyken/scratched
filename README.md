@@ -1,10 +1,13 @@
 # Scratched
 
-Lists the files that will be deleted from the Graham scratch folder on the 15th of the month. This utility offers two main advantages over running `cat /home/scratch_to_delete/[username]`:
+Lists the files that will be deleted from the Graham scratch folder on the 15th of the month. This utility offers the following advantages over running `cat /home/scratch_to_delete/$(whoami)`:
 
-1. Updateable: by running the command with `--update`, a new `scratch_to_delete` file will be generated in your `~/.cache` dir. This file will exclude any scratch files already deleted or updated (via touch or otherwise).
 
-2. Depth: via the `--depth` flag, the number of subfolders listed can be easily controlled. This limits the printout to only the top-level directories, making it easier to digest the information.
+1. Depth: via the `--depth` flag, the number of subfolders listed can be easily controlled. This limits the printout to only the top-level directories, making it easier to digest the information. The `--ls` flag can be used to automatically set the depth to show only the immediate children of your filter (see below), although this may be slower for large scratched lists.
+
+2. Filterable: The command takes `grep` filters to filter the list down to directories you care about. This is especially powerful combined with...
+
+3. Various actions modes: Using `--delete` and `--touch`, you can automatically delete/touch all the files selected by your filter. This automatically updates your scratch list, so you won't see these files on future invocations of `scratched`. If you've made manual touches or deletions, you can register these with `scratched` by with `--update`. (`scratched` does not alter the official graham `scratch_to_delete` file, but maintains it's own version of the file in your `~/.cache` dir).
 
 
 ```
