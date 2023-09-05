@@ -17,24 +17,57 @@ Usage: scratched [OPTIONS] [PATTERN]
 
 List the files that will be deleted on the 15th of the month.
 
-By default, the files listed in /home/scratch_to_delete/[username] are listed,
-but an updated version of this list can be produced using the -u/--update flag.
-Any files that have been deleted or updated (via touch or otherwise) will be
-removed from the list
+PATTERN is a regex filter applied to the file list BEFORE any command actions are
+taken.
+
+The command operates in one of a few modes:
+
+- list:   List all file paths seperated by newlines. Default mode.
+- update: Update the \`scratch_to_delete\` list. Files already deleted or touched more
+          recently than the deadline are removed from the list. Activated using
+          -u/--update.
+- delete: Delete all files. Activated using --delete
+- touch:  Touch all files that currently exist. Files that have already been deleted
+          are ignored. Activated using --touch
+
+Finally, \`scratched\` has a \`--check\` mode that exits 0 if the official
+\`scratch_to_delete\` file is newer than the local cache. This is useful for a
+\`.bashrc\` file check:
+
+  if scratched --check; then
+    >&2 echo "scratch_to_delete has been updated"
+  fi
 
 Options
 =======
   PATTERN
-    regex pattern to match
+    Regex path filter. scratched only acts on files kept by the filter (including
+    list, update, delete, and touch modes)
 
   -d NUM, --depth NUM
     The maximum file tree depth to display. e.g. -d 3 would print up to 3
     subdirectories: '/scratch/username/foo'
 
+  --ls
+    Automatically determine the depth so that only the immediate children of directories
+    selected by PATTERN are shown. If no PATTERN is given, then only immediate children
+    of the top scratch directory are printed    
+
   -u, --update
     Generate an updated version of the scratch_to_delete list, excluding any
-    files that have already been updated or deleted
+    files that have already been updated or deleted. For long scratched lists, this
+    operation can take a very long time; it is therefore recommended to pre-filter the
+    filelist using PATTERN.
 
+  --delete
+    Delete all files selected by the filter
+
+  --touch
+    Touch all files selected by the filter that currently exist
+
+  --check
+    Check if the official `scratch_to_delete` file on graham has been updated compared
+    to the local cached version.
 EOF
 }
 
@@ -42,6 +75,10 @@ excluded=
 depth=
 update=
 params=
+delete=
+touch_=
+check=
+list=
 while [[ -n "${1:-}" && ! "$1" == "--" ]]; do case "$1" in
   -e | --exclude )
     while [[ -n $2 && "$2" =~ ^[^-] ]]; do
@@ -60,6 +97,18 @@ while [[ -n "${1:-}" && ! "$1" == "--" ]]; do case "$1" in
     ;;
   -u | --update )
     update=true
+    ;;
+  --delete )
+    delete=true
+    ;;
+  --touch )
+    touch_=true
+    ;;
+  --check )
+    check=true
+    ;;
+  --ls )
+    list=true
     ;;
   -h | --help )
     printHelp
@@ -81,7 +130,32 @@ if [[ $(echo "$params" | wc -w) -gt 1 ]]; then
   exit 1
 fi
 
+if [[ -n "$delete" && -n "$touch_" ]]; then
+  >&2 echo "--touch and --delete may not be simultaneously specified"
+  exit 1
+fi
+
+
+if [[ -n "$delete"  || -n "$touch_" ]]; then
+  update=true
+fi
+
+if [[ -n "$update" && "$list" ]]; then
+  echo "Error: --ls cannot be used with --delete, --touch, or --update" >&2
+  exit 1
+fi
+
+if [[ -n "$depth" && "$list" ]]; then
+  echo "Error: --ls cannot be combined with --depth" >&2
+  exit 1
+fi
+
 pattern=$(echo "$params" | trim)
+
+if [[ -z "$pattern" && -n "$list" ]]; then
+  list=
+  depth=3
+fi
 
 
 
@@ -114,23 +188,52 @@ date_milli () {
   date +'%s%3N'
 }
 
+grep_filter () {
+    eval $([[ -n "$pattern" ]] && echo 'grep -E "$pattern"' || echo 'cat')
+}
+
+minify () {
+  sed -E 's'$'\001''(^.*('"$pattern"')[^/]*/([^/]+/?)?).*$'$'\001''\1'$'\001'
+}
+
+
+# export -f minify
+minify_if_cli () {
+  if [[ -n "$list" ]]; then
+    minify | sort -u
+  else
+    cat
+  fi
+}
+
+
 official=/home/scratch_to_delete/$(whoami)
 ours=$HOME/.cache/scratch_to_delete
 
 if [[ $official -nt $ours ]]; then
   src=$official
+  if [[ -n "$check" ]]; then
+    exit 0
+  fi
 else
   src=$ours
+  if [[ -n "$check" ]]; then
+    exit 1
+  fi
 fi
 
+
 if [[ -n $update ]]; then
-  tmp=$(mktemp "${TMPDIR:-/tmp/}$(basename $0).XXXXXXXXXX")
+  tmp=$(mktemp "${TMPDIR:-/tmp}/$(basename $0).XXXXXXXXXX")
   maxtime=5184000
   i=0
-  len=$(cat $src | wc -l)
+  len=$(cat $src | grep_filter | wc -l)
   debounce=50
   last_update=
-  for f in $(cat $src); do
+  if [[ -n "$pattern" ]]; then
+    grep -v "$pattern" "$src" >> $tmp
+  fi
+  for f in $(cat $src | grep_filter); do
     i=$((i+1))
     if [[ $(($last_update + $debounce)) -lt $(date_milli) ]]; then
       last_update=$(date_milli)
@@ -140,11 +243,15 @@ if [[ -n $update ]]; then
     if [[ "* $f *" == " $excluded " ]]; then
       continue
     fi
-    if [[ -e $f ]]; then
-      atime=$(($(date +%s) - $(stat -c %X $f)))
-      ctime=$(($(date +%s) - $(stat -c %Z $f)))
+    if [[ -n "$delete" ]]; then
+      rm "$f" ||:
+    elif [[ -n "$touch_" ]]; then
+      touch -c "$f"
+    elif [[ -e "$f" ]]; then
+      atime=$(($(date +%s) - $(stat -c %X "$f")))
+      ctime=$(($(date +%s) - $(stat -c %Z "$f")))
       if [[ $atime -gt $maxtime || $ctime -gt $maxtime ]]; then
-        echo $f >> $tmp
+        echo "$f" >> $tmp
       fi
     fi
   done
@@ -155,6 +262,5 @@ if [[ -n $update ]]; then
 
 else
   cat $src |
-    set_depth $depth |
-    eval $([[ -n "$pattern" ]] && echo 'grep "$pattern"' || echo 'cat')
+    set_depth $depth | grep_filter | minify_if_cli
 fi
