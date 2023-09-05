@@ -18,16 +18,16 @@ taken.
 The command operates in one of a few modes:
 
 - list:   List all file paths seperated by newlines. Default mode.
-- update: Update the \`scratch_to_delete\` list. Files already deleted or touched more
+- update: Update the `scratch_to_delete` list. Files already deleted or touched more
           recently than the deadline are removed from the list. Activated using
           -u/--update.
 - delete: Delete all files. Activated using --delete
 - touch:  Touch all files that currently exist. Files that have already been deleted
           are ignored. Activated using --touch
 
-Finally, \`scratched\` has a \`--check\` mode that exits 0 if the official
-\`scratch_to_delete\` file is newer than the local cache. This is useful for a
-\`.bashrc\` file check:
+Finally, `scratched` has a `--check` mode that exits 0 if the official
+`scratch_to_delete` file is newer than the local cache. This is useful for a
+`.bashrc` file check:
 
   if scratched --check; then
     >&2 echo "scratch_to_delete has been updated"
