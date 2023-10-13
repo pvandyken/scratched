@@ -21,9 +21,11 @@ taken.
 The command operates in one of a few modes:
 
 - list:   List all file paths seperated by newlines. Default mode.
+- ls:     Like list, but only display immediate children of the current or specified
+          directory
 - update: Update the `scratch_to_delete` list. Files already deleted or touched more
           recently than the deadline are removed from the list. Activated using
-          -u/--update.
+          -u/--update. 
 - delete: Delete all files. Activated using --delete
 - touch:  Touch all files that currently exist. Files that have already been deleted
           are ignored. Activated using --touch
@@ -40,16 +42,23 @@ Options
 =======
   PATTERN
     Regex path filter. scratched only acts on files kept by the filter (including
-    list, update, delete, and touch modes)
+    list, update, delete, and touch modes). Alternatively, in ls mode, an absolute or
+    relative path
 
   -d NUM, --depth NUM
     The maximum file tree depth to display. e.g. -d 3 would print up to 3
     subdirectories: '/scratch/username/foo'
 
   --ls
-    Automatically determine the depth so that only the immediate children of directories
-    selected by PATTERN are shown. If no PATTERN is given, then only immediate children
-    of the top scratch directory are printed    
+    Display only paths that are immediate children of the current working directory.
+    Directories listed are those containing files to be deleted. If PATTERN is given,
+    it is interpreted as an absolute path (if it starts with `/`) at which to search,
+    or a relative path to the current workig directory. Note that this cannot be
+    combined with --update, --delete, or --touch. To restrict any of these operations
+    to the current working directory, use --pwd.
+
+  --pwd
+    Adds the current working directory to the start of the filter.
 
   -u, --update
     Generate an updated version of the scratch_to_delete list, excluding any
