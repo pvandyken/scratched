@@ -278,7 +278,7 @@ fi
 
 if [[ -n $update ]]; then
   tmp=$(mktemp "${TMPDIR:-/tmp}/$(basename $0).XXXXXXXXXX")
-  maxtime=5184000
+  maxtime=1296000
   i=0
   len=$(cat $src | grep_filter | wc -l)
   debounce=50
